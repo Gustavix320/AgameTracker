@@ -35,10 +35,13 @@ function parsearTorneio(
   const horario = partes[2] || "0000";
   const nome = partes[3] || "torneio";
 
-  const buyinParte = partes.find((p) => p.startsWith("bi"));
-  const gtdParte = partes.find((p) => p.startsWith("gtd"));
+  const gtdParte = partes.find((p) => p.toLowerCase().startsWith("gtd"));
 
-  const buyin = buyinParte ? Number(buyinParte.replace("bi", "")) : 0;
+  const buyinMatch = nomeSemExtensao
+    .toLowerCase()
+    .match(/(?:^|_)bi(\d+(?:\.\d+)?)(?:_|$)/);
+
+  const buyin = buyinMatch ? Number(buyinMatch[1]) : 0;
 
   const garantidoTexto = gtdParte ? gtdParte.replace("gtd", "") : "";
 
