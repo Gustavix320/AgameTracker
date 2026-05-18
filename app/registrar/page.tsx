@@ -14,7 +14,7 @@ type Torneio = {
   imagem: string;
   garantido?: string;
   estrutura?: string;
-  categoria?: "normal" | "satelites";
+  categoria?: "normal" | "principais" | "satelites";
   alvo?: string;
 };
 
@@ -99,6 +99,12 @@ useEffect(() => {
 
     const dataNormal = await responseNormal.json();
 
+    const responsePrincipais = await fetch(
+      `/api/torneios?app=${appSelecionado.toLowerCase()}&dia=${dia}&categoria=principais`
+    );
+
+    const dataPrincipais = await responsePrincipais.json();
+
     const responseSatelites = await fetch(
       `/api/torneios?app=${appSelecionado.toLowerCase()}&dia=${dia}&categoria=satelites`
     );
@@ -106,13 +112,8 @@ useEffect(() => {
     const dataSatelites = await responseSatelites.json();
 
     setTorneios(dataNormal);
+    setTorneiosPrincipais(dataPrincipais);
     setSatelites(dataSatelites);
-
-    setTorneiosPrincipais(
-      dataNormal.filter((torneio: Torneio) =>
-        ["highs", "mysteryhr", "omaxhr"].includes(String(torneio.alvo || ""))
-      )
-    );
   }
 
   carregarTorneios();
@@ -767,6 +768,34 @@ const averagePlayers =
             </div>
           </div>
 
+          <div className="flex gap-3 mb-4">
+            <button
+              onClick={() => {
+                setModoSelecao("torneio");
+                setTorneioSelecionado(null);
+                setTorneioAlvoSatelite(null);
+              }}
+              className={`px-5 py-3 rounded-xl font-bold ${
+                modoSelecao === "torneio" ? "bg-green-600" : "bg-zinc-800"
+              }`}
+            >
+              Torneios
+            </button>
+
+            <button
+              onClick={() => {
+                setModoSelecao("satelite");
+                setTorneioSelecionado(null);
+                setTorneioAlvoSatelite(null);
+              }}
+              className={`px-5 py-3 rounded-xl font-bold ${
+                modoSelecao === "satelite" ? "bg-purple-600" : "bg-zinc-800"
+              }`}
+            >
+              Satélites
+            </button>
+          </div>
+
           <div className="max-w-xl mb-6 relative">
             <button
               onClick={() => setMenuAberto(!menuAberto)}
@@ -775,6 +804,10 @@ const averagePlayers =
               <span>
                 {torneioSelecionado
                   ? torneioSelecionado.nome
+                  : modoSelecao === "satelite"
+                  ? torneioAlvoSatelite
+                    ? "Selecionar satélite"
+                    : "Selecionar torneio principal"
                   : "Selecionar torneio"}
               </span>
 
@@ -790,10 +823,23 @@ const averagePlayers =
                       : "space-y-3"
                   }
                 >
-                  {torneios.map((torneio) => (
+                  {(
+                    modoSelecao === "torneio"
+                      ? torneios
+                      : torneioAlvoSatelite
+                      ? satelites.filter(
+                          (sat) => sat.alvo === torneioAlvoSatelite.alvo
+                        )
+                      : torneiosPrincipais
+                  ).map((torneio) => (
                     <button
                       key={torneio.id}
                       onClick={() => {
+                        if (modoSelecao === "satelite" && !torneioAlvoSatelite) {
+                          setTorneioAlvoSatelite(torneio);
+                          return;
+                        }
+
                         setTorneioSelecionado(torneio);
                         setGarantido(String(torneio.garantido || ""));
                         setAddonValor(torneio.buyin || 0);
