@@ -14,6 +14,8 @@ type Torneio = {
   imagem: string;
   garantido?: string;
   estrutura?: string;
+  categoria?: "normal" | "satelites";
+  alvo?: string;
 };
 
 type PrintResultado = {
@@ -35,6 +37,9 @@ type Registro = {
   printsResultado: PrintResultado[];
   addonValor: number;
   ganhosPorConta: string[];
+  isSatelite?: boolean;
+  torneioAlvo?: Torneio | null;
+  vagasPorConta?: boolean[];
 };
 
 export default function RegistrarPage() {
@@ -48,7 +53,10 @@ export default function RegistrarPage() {
   const [appSelecionado, setAppSelecionado] = useState<"Suprema" | "PPP">("PPP");
   const [menuAberto, setMenuAberto] = useState(false);
   const [torneioSelecionado, setTorneioSelecionado] = useState<Torneio | null>(null);
-
+  const [modoSelecao, setModoSelecao] = useState<"torneio" | "satelite">("torneio");
+  const [torneiosPrincipais, setTorneiosPrincipais] = useState<Torneio[]>([]);
+  const [torneioAlvoSatelite, setTorneioAlvoSatelite] = useState<Torneio | null>(null);
+  const [satelites, setSatelites] = useState<Torneio[]>([]);
   const [contas, setContas] = useState(1);
   const [rebuys, setRebuys] = useState(0);
   const [addons, setAddons] = useState(0);
@@ -85,13 +93,26 @@ useEffect(() => {
   async function carregarTorneios() {
     const dia = obterDiaSemana(dataRegistro);
 
-    const response = await fetch(
+    const responseNormal = await fetch(
       `/api/torneios?app=${appSelecionado.toLowerCase()}&dia=${dia}`
     );
 
-    const data = await response.json();
+    const dataNormal = await responseNormal.json();
 
-    setTorneios(data);
+    const responseSatelites = await fetch(
+      `/api/torneios?app=${appSelecionado.toLowerCase()}&dia=${dia}&categoria=satelites`
+    );
+
+    const dataSatelites = await responseSatelites.json();
+
+    setTorneios(dataNormal);
+    setSatelites(dataSatelites);
+
+    setTorneiosPrincipais(
+      dataNormal.filter((torneio: Torneio) =>
+        ["highs", "mysteryhr", "omaxhr"].includes(String(torneio.alvo || ""))
+      )
+    );
   }
 
   carregarTorneios();
@@ -167,6 +188,9 @@ useEffect(() => {
       aberto: false,
       printsResultado: [],
       ganhosPorConta: Array(contas + rebuys).fill(""),
+      isSatelite: modoSelecao === "satelite",
+      torneioAlvo: torneioAlvoSatelite,
+      vagasPorConta: Array(contas + rebuys).fill(false),
     };
 
     setRegistros([novoRegistro, ...registros]);
@@ -550,6 +574,42 @@ useEffect(() => {
       })
     );
   }
+
+function atualizarVagaSatelite(
+  registroId: number,
+  indexConta: number,
+  ganhou: boolean
+) {
+  setRegistros((atual) =>
+    atual.map((registro) => {
+      if (registro.id !== registroId) return registro;
+
+      const vagasPorConta = [
+        ...(registro.vagasPorConta || Array(registro.contas + registro.rebuys).fill(false)),
+      ];
+
+      vagasPorConta[indexConta] = ganhou;
+
+      const valorVaga = numero(registro.torneioAlvo?.buyin || 0);
+
+      const ganhosPorConta = vagasPorConta.map((vaga) =>
+        vaga ? String(valorVaga) : ""
+      );
+
+      const somaGanhos = ganhosPorConta.reduce(
+        (acc, valor) => acc + numero(valor),
+        0
+      );
+
+      return {
+        ...registro,
+        vagasPorConta,
+        ganhosPorConta,
+        ganho: somaGanhos.toFixed(2),
+      };
+    })
+  );
+}
 
 async function finalizarGrind() {
   if (registros.length === 0) return;
@@ -1073,9 +1133,62 @@ const averagePlayers =
                       </div>
 
                       <div className="space-y-3">
-                        <label className="text-zinc-500 text-sm">
-                          Valores ganhos por conta
-                        </label>
+                        {registro.isSatelite ? (
+                          <div className="space-y-3">
+                            <label className="text-zinc-500 text-sm">
+                              Vaga ganha?
+                            </label>
+
+                            {(registro.vagasPorConta || Array(registro.contas + registro.rebuys).fill(false)).map(
+                              (ganhou, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between bg-zinc-900 p-3 rounded-xl"
+                                >
+                                  <div>
+                                    <p className="text-zinc-300 font-bold">
+                                      {index < registro.contas
+                                        ? `Conta ${index + 1}`
+                                        : `Rebuy ${index - registro.contas + 1}`}
+                                    </p>
+
+                                    <p className="text-zinc-500 text-xs">
+                                      Alvo: {registro.torneioAlvo?.nome || "Torneio principal"}
+                                    </p>
+                                  </div>
+
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => atualizarVagaSatelite(registro.id, index, true)}
+                                      className={`px-4 py-2 rounded-xl font-bold ${
+                                        ganhou
+                                          ? "bg-green-600 text-white"
+                                          : "bg-zinc-800 hover:bg-green-700"
+                                      }`}
+                                    >
+                                      ✅ Ganhou
+                                    </button>
+
+                                    <button
+                                      onClick={() => atualizarVagaSatelite(registro.id, index, false)}
+                                      className={`px-4 py-2 rounded-xl font-bold ${
+                                        !ganhou
+                                          ? "bg-red-600 text-white"
+                                          : "bg-zinc-800 hover:bg-red-700"
+                                      }`}
+                                    >
+                                      ❌ Não
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            {/* mantém aqui seu bloco atual de valores ganhos por conta + anexar print */}
+                          </>
+                        )}
 
                         {(registro.ganhosPorConta || Array(registro.contas).fill("")).map(
                           (valor, index) => (
