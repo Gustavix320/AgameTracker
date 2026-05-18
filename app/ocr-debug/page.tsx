@@ -83,7 +83,7 @@ export default function OCRDebugPage() {
     canvas,
     "eng",
     {
-        logger: (m) => console.log(m),
+        logger: (m: unknown) => console.log(m),
         tessedit_char_whitelist: "0123456789.,",
     } as any
     );
